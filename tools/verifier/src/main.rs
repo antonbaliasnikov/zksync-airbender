@@ -114,6 +114,12 @@ unsafe fn workload() -> ! {
     riscv_common::zksync_os_finish_success_extended(&output);
 }
 
+#[cfg(any(feature = "recursion_log_23_step"))]
+unsafe fn workload() -> ! {
+    let output = full_statement_verifier::verify_recursion_log_23_layer();
+    riscv_common::zksync_os_finish_success_extended(&output);
+}
+
 #[cfg(feature = "final_recursion_step")]
 unsafe fn workload() -> ! {
     let output = full_statement_verifier::verify_final_recursion_layer();
@@ -185,6 +191,10 @@ unsafe fn workload() -> ! {
             result[8..16].copy_from_slice(&output1[8..16]);
 
             riscv_common::zksync_os_finish_success_extended(&result);
+        }
+        5 => {
+            let output = full_statement_verifier::verify_recursion_log_23_layer();
+            riscv_common::zksync_os_finish_success_extended(&output);
         }
         other => {
             let Some(pos) =

@@ -7,8 +7,8 @@ use clap::{Parser, Subcommand};
 use cli_lib::generate_constants::generate_constants_for_binary;
 use cli_lib::prover_utils::{
     create_final_proofs_from_program_proof, create_proofs, generate_oracle_data_from_metadata,
-    serialize_to_file, u32_from_hex_string, ProvingLimit, VerifierCircuitsIdentifiers,
-    DEFAULT_CYCLES,
+    serialize_to_file, u32_from_hex_string, ProvingLimit, RecursionStrategy,
+    VerifierCircuitsIdentifiers, DEFAULT_CYCLES,
 };
 use cli_lib::Machine;
 
@@ -81,6 +81,8 @@ enum Commands {
         /// If set, run the recursion, until a given moment.
         #[arg(long)]
         until: Option<ProvingLimit>,
+        #[arg(long, value_enum, default_value = "use-reduced-log23-machine")]
+        mode: RecursionStrategy,
 
         /// If set, the temporary data (e.g. intermediate proofs) will be stored in the given directory.
         #[arg(long)]
@@ -96,6 +98,11 @@ enum Commands {
         input: InputConfig,
         #[arg(long, default_value = "output")]
         output_dir: String,
+        #[arg(long, value_enum, default_value = "use-reduced-log23-machine")]
+        mode: RecursionStrategy,
+        /// If true, use GPU for proving.
+        #[arg(long)]
+        gpu: bool,
     },
     /// Verifies a single proof.
     Verify {
@@ -167,6 +174,7 @@ enum Commands {
     // These can be considered quasi 'verification' keys - as they tie the final proof
     // to the original bytecode (and verifications).
     GenerateConstants {
+        #[arg(short, long)]
         bin: String,
         /// If true, use the universal verifier (used by the cli tool).
         /// If false, use separate verifiers.
@@ -176,6 +184,8 @@ enum Commands {
         /// If false, use the ones from the vk.json files.
         #[arg(long)]
         recompute: bool,
+        #[arg(long, value_enum, default_value = "use-reduced-log23-machine")]
+        mode: RecursionStrategy,
     },
 }
 
@@ -259,6 +269,7 @@ fn main() {
             prev_metadata,
             cycles,
             until,
+            mode,
             tmp_dir,
             gpu,
         } => {
@@ -271,17 +282,24 @@ fn main() {
                 machine,
                 cycles,
                 until,
+                *mode,
                 tmp_dir,
                 gpu.clone(),
             );
         }
-        Commands::ProveFinal { input, output_dir } => {
+        Commands::ProveFinal {
+            input,
+            output_dir,
+            mode,
+            gpu,
+        } => {
             let input = fetch_final_input_json(input).expect("Failed to fetch");
 
             let input_program_proof: ProgramProof = serde_json::from_str(&input.unwrap())
                 .expect("Failed to parse input_hex into ProgramProof");
 
-            let program_proof = create_final_proofs_from_program_proof(input_program_proof);
+            let program_proof =
+                create_final_proofs_from_program_proof(input_program_proof, *mode, *gpu);
 
             serialize_to_file(
                 &program_proof,
@@ -351,7 +369,8 @@ fn main() {
             bin,
             universal_verifier,
             recompute,
-        } => generate_constants_for_binary(bin, universal_verifier, recompute),
+            mode,
+        } => generate_constants_for_binary(bin, mode, universal_verifier, recompute),
     }
 }
 
@@ -633,6 +652,14 @@ fn run_binary(
             result.state.registers
         }
         Machine::Reduced => {
+            let result = run_simple_with_entry_point_and_non_determimism_source_for_config::<
+                _,
+                IWithoutByteAccessIsaConfigWithDelegation,
+            >(config, non_determinism_source);
+
+            result.state.registers
+        }
+        Machine::ReducedLog23 => {
             let result = run_simple_with_entry_point_and_non_determimism_source_for_config::<
                 _,
                 IWithoutByteAccessIsaConfigWithDelegation,
