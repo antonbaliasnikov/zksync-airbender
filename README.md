@@ -5,6 +5,7 @@
 This repository contains the RISC-V compilation and proving tools for the ZKsync project, including implementations of RISC-V circuits, a RISC-V simulator, and utilities for witness generation, proof creation, and verification.
 
 TMP: release 0.5.2
+TMP: release 0.5.3
 
 ## Documentation
 
