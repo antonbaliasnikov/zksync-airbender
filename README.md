@@ -6,6 +6,7 @@ This repository contains the RISC-V compilation and proving tools for the ZKsync
 
 TMP: release 0.5.2
 TMP: release 0.5.3
+TMP: release 0.5.4
 
 ## Documentation
 
